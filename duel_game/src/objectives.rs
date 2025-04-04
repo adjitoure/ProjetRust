@@ -10,6 +10,7 @@ use rand::Rng;
 /// # Retour
 ///
 /// Un vecteur contenant `count` nombres aléatoires.
+
 pub fn generate_objectives(count: u8) -> Vec<u8> {
     let mut rng = rand::thread_rng();
     (0..count).map(|_| rng.gen_range(0..=100)).collect()

@@ -18,125 +18,182 @@ use crate::player::Player;
 /// - Le gagnant choisit un poison à appliquer au perdant : -5 de vitesse ou -5 de force.
 /// 
 /// Les statistiques des joueurs sont ensuite mises à jour.
-pub fn play_round(player1: &mut Player, player2: &mut Player, nb_objectifs: u8) {
+
+pub fn play_round(player1: &mut Player, player2: &mut Player, nb_objectifs: u8) -> io::Result<()> {
     println!("----- Nouvelle Manche -----");
 
-    // Tour pour le joueur 1
+    // Tour du joueur 1
     println!("\nAu tour de {} (Vitality: {}, Speed: {}, Strength: {})", player1.name, player1.vitality, player1.speed, player1.strength);
     let objectives1 = generate_objectives(nb_objectifs);
     println!("Objectifs: {:?}", objectives1);
-    let mut total_score1: u32 = 0;
-    for (i, target) in objectives1.iter().enumerate() {
+
+    // Utilisation d'un itérateur et d'une closure pour collecter les scores
+    let scores1: io::Result<Vec<u32>> = objectives1.iter().enumerate().map(|(i, target)| {
         println!("\n--- {} - Objectif {}: Cible {} ---", player1.name, i + 1, target);
-        let result = play_objective(player1.speed);
+        let result = play_objective(player1.speed)?;
         let score_value = calculate_score(*target, &result, player1.strength);
-        total_score1 += score_value;
         println!("Score pour cet objectif: {}", score_value);
-    }
-    let average_score1 = if nb_objectifs == 0 {
+        Ok(score_value)
+    }).collect();
+
+    let scores1 = scores1?;
+    let average_score1 = if scores1.is_empty() {
         0
     } else {
-        (total_score1 as f32 / nb_objectifs as f32).ceil() as u32
+        (scores1.iter().sum::<u32>() as f32 / scores1.len() as f32).ceil() as u32
     };
     println!("Score moyen de {}: {}", player1.name, average_score1);
 
-    // Tour pour le joueur 2
+    // Tour du joueur 2
     println!("\nAu tour de {} (Vitality: {}, Speed: {}, Strength: {})", player2.name, player2.vitality, player2.speed, player2.strength);
     let objectives2 = generate_objectives(nb_objectifs);
     println!("Objectifs: {:?}", objectives2);
-    let mut total_score2: u32 = 0;
-    for (i, target) in objectives2.iter().enumerate() {
+
+    let scores2: io::Result<Vec<u32>> = objectives2.iter().enumerate().map(|(i, target)| {
         println!("\n--- {} - Objectif {}: Cible {} ---", player2.name, i + 1, target);
-        let result = play_objective(player2.speed);
+        let result = play_objective(player2.speed)?;
         let score_value = calculate_score(*target, &result, player2.strength);
-        total_score2 += score_value;
         println!("Score pour cet objectif: {}", score_value);
-    }
-    let average_score2 = if nb_objectifs == 0 {
+        Ok(score_value)
+    }).collect();
+
+    let scores2 = scores2?;
+    let average_score2 = if scores2.is_empty() {
         0
     } else {
-        (total_score2 as f32 / nb_objectifs as f32).ceil() as u32
+        (scores2.iter().sum::<u32>() as f32 / scores2.len() as f32).ceil() as u32
     };
     println!("Score moyen de {}: {}", player2.name, average_score2);
 
-    // Comparaison des scores et application des conséquences
+    // Comparaison et application des conséquences
     if average_score1 == average_score2 {
         println!("La manche est nulle, aucun changement de vitalité.");
     } else if average_score1 > average_score2 {
         let diff = average_score1 - average_score2;
         println!("{} gagne la manche !", player1.name);
         println!("{} perd {} points de vitalité.", player2.name, diff);
-        if player2.vitality > diff {
-            player2.vitality -= diff;
-        } else {
-            player2.vitality = 0;
-        }
-        // Choix du poison par le gagnant
+        player2.vitality = player2.vitality.saturating_sub(diff);
         println!("{} choisissez un poison à appliquer à {} :", player1.name, player2.name);
         println!("1: -5 de speed");
         println!("2: -5 de strength");
         print!("Votre choix (1 ou 2): ");
-        io::stdout().flush().unwrap();
+        io::stdout().flush()?;
         let mut choice = String::new();
-        io::stdin().read_line(&mut choice).unwrap();
+        io::stdin().read_line(&mut choice)?;
         match choice.trim() {
             "1" => {
-                if player2.speed >= 5 {
-                    player2.speed -= 5;
-                } else {
-                    player2.speed = 0;
-                }
+                player2.speed = player2.speed.saturating_sub(5);
                 println!("{} subit -5 de speed.", player2.name);
             },
             "2" => {
-                if player2.strength >= 5 {
-                    player2.strength -= 5;
-                } else {
-                    player2.strength = 0;
-                }
+                player2.strength = player2.strength.saturating_sub(5);
                 println!("{} subit -5 de strength.", player2.name);
             },
             _ => println!("Choix invalide. Aucun poison appliqué."),
         }
-    } else { // average_score2 > average_score1
+    } else {
         let diff = average_score2 - average_score1;
         println!("{} gagne la manche !", player2.name);
         println!("{} perd {} points de vitalité.", player1.name, diff);
-        if player1.vitality > diff {
-            player1.vitality -= diff;
-        } else {
-            player1.vitality = 0;
-        }
+        player1.vitality = player1.vitality.saturating_sub(diff);
         println!("{} choisissez un poison à appliquer à {} :", player2.name, player1.name);
         println!("1: -5 de speed");
         println!("2: -5 de strength");
         print!("Votre choix (1 ou 2): ");
-        io::stdout().flush().unwrap();
+        io::stdout().flush()?;
         let mut choice = String::new();
-        io::stdin().read_line(&mut choice).unwrap();
+        io::stdin().read_line(&mut choice)?;
         match choice.trim() {
             "1" => {
-                if player1.speed >= 5 {
-                    player1.speed -= 5;
-                } else {
-                    player1.speed = 0;
-                }
+                player1.speed = player1.speed.saturating_sub(5);
                 println!("{} subit -5 de speed.", player1.name);
             },
             "2" => {
-                if player1.strength >= 5 {
-                    player1.strength -= 5;
-                } else {
-                    player1.strength = 0;
-                }
+                player1.strength = player1.strength.saturating_sub(5);
                 println!("{} subit -5 de strength.", player1.name);
             },
             _ => println!("Choix invalide. Aucun poison appliqué."),
         }
     }
-
-    // Affichage final des statistiques après la manche
+    
     println!("\n--- Fin de la Manche ---");
     println!("{}: Vitality: {}, Speed: {}, Strength: {}", player1.name, player1.vitality, player1.speed, player1.strength);
     println!("{}: Vitality: {}, Speed: {}, Strength: {}", player2.name, player2.vitality, player2.speed, player2.strength);
+    
+    Ok(())
+}
+
+pub fn play_round_multi(players: &mut Vec<Player>, nb_objectifs: u8) -> io::Result<()> {
+    println!("----- Nouvelle Manche (Multi-joueurs) -----");
+    let mut scores = Vec::new();
+    for player in players.iter_mut() {
+        println!("\nAu tour de {} (Vitality: {}, Speed: {}, Strength: {})", player.name, player.vitality, player.speed, player.strength);
+        let objectives = generate_objectives(nb_objectifs);
+        println!("Objectifs: {:?}", objectives);
+        let player_scores: io::Result<Vec<u32>> = objectives.iter().enumerate().map(|(i, target)| {
+            println!("\n--- {} - Objectif {}: Cible {} ---", player.name, i + 1, target);
+            let result = play_objective(player.speed)?;
+            let score = calculate_score(*target, &result, player.strength);
+            println!("Score pour cet objectif: {}", score);
+            Ok(score)
+        }).collect();
+        let player_scores = player_scores?;
+        let avg = if player_scores.is_empty() {
+            0
+        } else {
+            (player_scores.iter().sum::<u32>() as f32 / player_scores.len() as f32).ceil() as u32
+        };
+        println!("Score moyen de {}: {}", player.name, avg);
+        scores.push(avg);
+    }
+    // Déterminer le score maximum
+    let max_score = scores.iter().cloned().max().unwrap_or(0);
+    // Pour chaque joueur non gagnant, appliquer une perte de vitalité égale à la différence.
+    for (i, player) in players.iter_mut().enumerate() {
+        if scores[i] < max_score {
+            let diff = max_score - scores[i];
+            println!("{} perd {} points de vitalité.", player.name, diff);
+            player.vitality = player.vitality.saturating_sub(diff);
+        }
+    }
+    // Le gagnant choisit un joueur à pénaliser.
+    if let Some((winner_idx, _winner)) = scores.iter().enumerate().find(|&(_, &score)| score == max_score) {
+        println!("{} est le gagnant de la manche !", players[winner_idx].name);
+        println!("{} choisissez un joueur à pénaliser (saisissez le numéro correspondant) :", players[winner_idx].name);
+        for (i, player) in players.iter().enumerate() {
+            if i != winner_idx {
+                println!("{}: {}", i, player.name);
+            }
+        }
+        print!("Votre choix: ");
+        io::stdout().flush()?;
+        let mut choice = String::new();
+        io::stdin().read_line(&mut choice)?;
+        if let Ok(idx) = choice.trim().parse::<usize>() {
+            if idx < players.len() && idx != winner_idx {
+                println!("{} choisissez un poison pour {} : 1: -5 de speed, 2: -5 de strength", players[winner_idx].name, players[idx].name);
+                print!("Votre choix (1 ou 2): ");
+                io::stdout().flush()?;
+                let mut poison = String::new();
+                io::stdin().read_line(&mut poison)?;
+                match poison.trim() {
+                    "1" => {
+                        players[idx].speed = players[idx].speed.saturating_sub(5);
+                        println!("{} subit -5 de speed.", players[idx].name);
+                    },
+                    "2" => {
+                        players[idx].strength = players[idx].strength.saturating_sub(5);
+                        println!("{} subit -5 de strength.", players[idx].name);
+                    },
+                    _ => println!("Choix invalide. Aucun poison appliqué."),
+                }
+            }
+        }
+    }
+
+    println!("\n--- Fin de la Manche ---");
+    for player in players.iter() {
+        println!("{}: Vitality: {}, Speed: {}, Strength: {}", player.name, player.vitality, player.speed, player.strength);
+    }
+    Ok(())
 }

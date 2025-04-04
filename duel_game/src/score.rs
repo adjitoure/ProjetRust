@@ -11,15 +11,12 @@ use crate::turn::TurnResult;
 /// # Retour
 ///
 /// Le score calculé pour cet objectif.
+
 pub fn calculate_score(target: u8, result: &TurnResult, force: u32) -> u32 {
     let counter = result.counter;
     let miss = result.miss;
     // Calcul de la différence brute
-    let diff_raw = if target >= counter {
-        target - counter
-    } else {
-        counter - target
-    };
+    let diff_raw = if target >= counter { target - counter } else { counter - target };
     // Calcul de la différence circulaire
     let diff = if diff_raw > 50 { 100 - diff_raw } else { diff_raw };
 
@@ -36,6 +33,5 @@ pub fn calculate_score(target: u8, result: &TurnResult, force: u32) -> u32 {
         20
     };
 
-    // Calcul du score
     (base as u32 + force) / (miss + 1)
 }
